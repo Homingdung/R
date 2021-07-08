@@ -1,0 +1,527 @@
+---
+title: "Risk Analysis for Bank"
+author: "Mingdong HE"
+output: pdf_document
+---
+
+```{r include = FALSE}
+knitr::opts_chunk$set(echo=FALSE)
+```
+
+# Introduction
+
+In this analysis, we investigated the relationship between the credit score and various other measurements. We use *Train.txt* to build a model and then to predict credit scores based on it. We also classify the individuals from *Test.txt* into two groups and we get the proportion of the individuals which are correctly classified by our model. Prediction intervals are also given.
+
+# Exploratory Analysis
+
+This data set is composed of 21 measured data about loan applicants. For each applicant, the credit score has been measured, along with the following 20 variables:
+
+Status, Duration, History, Purpose, Amount, Savings, Employment, Disposable, Personal, OtherParties,
+Residence, Property, Age, Plans, Housing, Existing, Job, Dependants, Telephone, Foreign, CreditScore. 
+
+```{r echo=FALSE}
+library(ggplot2)
+library(dplyr)
+library(carData)
+library(car)
+Train<-read.table("Train.txt",header=T)
+Test<-read.table("Test.txt",header=T)
+Train<-Train %>% mutate_if(is.character,as.factor)
+Train$Disposable<-factor(Train$Disposable)
+Train$OtherParties<-factor(Train$OtherParties)
+Train$Residence<-factor(Train$Residence)
+Train$Existing<-factor(Train$Existing)
+Train$Dependants<-factor(Train$Dependants)
+str(Train)
+
+#Do the same process for Test data
+Test<-Test %>% mutate_if(is.character,as.factor)
+Test$Disposable<-factor(Test$Disposable)
+Test$OtherParties<-factor(Test$OtherParties)
+Test$Residence<-factor(Test$Residence)
+Test$Existing<-factor(Test$Existing)
+Test$Dependants<-factor(Test$Dependants)
+```
+
+We will only treat Duration, Amount, Age as numerical variables while others will be treated as factors, since other types of variables are either factors or with a very small number of distinct possibilities they can take.
+
+Let's plot the pairwise scatter plots for continuous measurements.
+
+```{r echo=FALSE}
+plot(Train[,c(2,5,13,21)])
+```
+
+Let's use boxplots for factors:
+
+```{r echo=FALSE}
+par(mfrow=c(2,3))
+boxplot(Train$CreditScore~Train$Status)
+boxplot(Train$CreditScore~Train$History)
+boxplot(Train$CreditScore~Train$Purpose)
+boxplot(Train$CreditScore~Train$Savings)
+boxplot(Train$CreditScore~Train$Employment)
+boxplot(Train$CreditScore~Train$Disposable)
+par(mfrow=c(2,3))
+boxplot(Train$CreditScore~Train$Personal)
+boxplot(Train$CreditScore~Train$OtherParties)
+boxplot(Train$CreditScore~Train$Residence)
+boxplot(Train$CreditScore~Train$Property)
+boxplot(Train$CreditScore~Train$Plans)
+boxplot(Train$CreditScore~Train$Housing)
+```
+```{r echo=FALSE}
+par(mfrow=c(2,3))
+boxplot(Train$CreditScore~Train$Property)
+boxplot(Train$CreditScore~Train$Plans)
+boxplot(Train$CreditScore~Train$Housing)
+boxplot(Train$CreditScore~Train$Existing)
+boxplot(Train$CreditScore~Train$Job)
+boxplot(Train$CreditScore~Train$Dependants)
+par(mfrow=c(2,3))
+boxplot(Train$CreditScore~Train$Telephone)
+boxplot(Train$CreditScore~Train$Foreign)
+```
+
+**Interpretation**:
+
+The pariwise scatter plot shows some relationships between each two variables. Focusing on the last row of figures, the associations between CreditScore and all the other variables can be seen. Applicant with higher Duration and Amount seems to have lower CreditScore while applicant with higher Age seems to have higher CreditScore. However, it also is important to note that there exists collinearity between the potential explanatory variables. For instance, applicant with higher Duration tends to have higher Amount, which shows that there seems to be a strong positive association between Duration and Amount. Therefore, it could be the fact that only one or two of these variables are required to explain differences in CreditScore. We can also see that data tend to cluster, especially for Amount and Age and we see a couple of extreme Amount points, which distorts the graph and make the general trend between Amount and other variables harder to determine from the plots. Taking *log(Amount)* might drastically reduces this effect.
+
+From the boxplots, we can see that applicant with Status (None) or History (E) or Purpose (UsedCar) or Savings (VeryLarge),
+Employment (VeryLong) or Disposable (3) or Personal (Single) or OtherParties (Guarantor) or Residence (2) or Property (House),
+Plans (None) or Housing (Own) or Existing (2) or Job (Skilled) or Dependants (1) or Telephone (Yes) or Foreign (No) tends to have higher a CreditScore. However, it seems that some factors like Employment, Disposable, Residence, Existing, Job, Dependants and Telephone do not have a significant affect on the CreditScore so the differences are very small. Moreover, there still exists correlations between these factors and continuous variables. For instance, applicant with worse previous history seems to have higher credit score, which could be explained by the correlation between History and Amount, i.e. applicant with bad previous loan history can not get much loan since banks are reluctant to lend money to him. We also see that foreign applicant has longer duration of requested loan. 
+
+```{r echo=FALSE}
+par(mfrow=c(1,3))
+boxplot(Train$Amount~Train$History)
+boxplot(Train$Duration~Train$Foreign)
+```
+
+Notice that this is just based on our eyeball so it is not persuasive. We need to use quantitative methods to find an appropriate model.
+
+Let's also check the distribution for continuous variables.
+
+```{r echo=FALSE}
+par(mfrow=c(2,2))
+hist(Train$Duration)
+hist(Train$Amount)
+hist(Train$Age)
+hist(Train$CreditScore)
+```
+
+**Interpretation**:
+
+From the histogram, besides the good distribution of CreditScore, the Duration, Amount and Age are all positively skewed. In order to rectify the skewness, we apply log transformation for them by Mosteller and Tukey's bulging rule. 
+
+$Duration \to log(Duration)$
+
+$Amount \to log(Amount)$
+
+$Age \to log(Age)$
+
+*(Please note that the data we use later has already been transformed as above, which will not be shown in the summary output)*.
+
+```{r echo=FALSE}
+Train$Duration<-log(Train$Duration)
+Train$Amount<-log(Train$Amount)
+Train$Age<-log(Train$Age)
+```
+
+Then we plot to have a look again for our transformed data.
+
+```{r echo=FALSE}
+plot(Train[,c(2,5,13,21)])
+```
+
+```{r echo=FALSE}
+par(mfrow=c(2,2))
+hist(Train$Duration)
+hist(Train$Amount)
+hist(Train$Age)
+hist(Train$CreditScore)
+```
+
+We could see that the positive skewness has been improved by transformation. 
+
+```{r echo=FALSE}
+par(mfrow=c(2,2))
+plot(Train$Duration,Train$CreditScore)
+plot(Train$Amount,Train$CreditScore)
+plot(Train$Age,Train$CreditScore)
+```
+
+
+**Interpretation**:
+
+From the plot, we can see the general associations:
+
++ negative association between $log(Duration)$ and $CreditScore$
++ negative association between $log(Amount)$ and $CreditScore$
++ positive association between $log(Age)$ and $CreditScore$ 
+
+We also see that there might exist unusual points which might provide us more information after we remove them.
+
+# Model fitting
+
+We start by fitting the model with all possible explanatory variables included, called *full model*.
+
+```{r echo=FALSE}
+fit_full<-lm(CreditScore~.,data=Train)#full model
+summary(fit_full)
+print(sprintf("fit_full$adj.r.squared = %f",summary(fit_full)$adj.r.squared))
+```
+
+**Interpretation**: 
+
+We see from the summary output that the $R_{adj}^2=0.703252$ suggests a relatively good fit. 
+
+Such small $p-values$ for Status tell us to reject $H_0$, which is an evidence that it has strong association with CreditScore. This could also been seen apparently from previous exploratory plots. As well as for History, applicant with History (C) or Hisotory (D) or History (E) tends to have a much higher credit score than History (A).
+
+For continuous variables, Duration and Amount are strongly associated with CreditScore by their $p-values<0.001$ while Age also has a very small $p-value=0.03375<0.05$, so we reject $H_0$ at $5\%$ level. From the exploratory plots, applicant with longer Duration or larger Amount has lower CreditScore, while applicant with higher Age has a higher CreditScore. 
+
+However, variables such as Employment, Residence, Existing, Job and Dependants have $p-values$ greater than $0.1$, which are not significant at the $10\%$ level after accounting for other factors. So there is no evidence that these variables are associated with CreditScore. The $p-values$ for Residence2 and PurposeRepairs are greater than $0.05$ but less than $0.1$, which could be considered as mildly significant. From the exploratory plots, we see that applicant with 2 years in current residence have a higher credit score than others in full years residence while applicant with purpose of Repairs have a higher credit score than other purposes. 
+
+The full model is not an ideal model since least significant variables are also included and it is too complex, which might cause over-fit and affect the accuracy for prediction. So the next step is to see which variables should be retained in order to find the most important predictors.
+
+# Model selection
+
+Due to a large number of variables, best subsets regression is not a good choice since there will be $2^{20}$ models to be fitted. Therefore, we try using the stepwise regression to optimize our variables selection in our model by using the AIC as the criterion.
+
+## Stepwise regression
+
+Let's fit the full model and use the backward stepwise regression.
+
+```{r echo=FALSE}
+fit_step1<-step(fit_full)
+```
+
+**Interpretation**:
+
+The AIC value is $6295.92$ for full model, after backward stepwise regression, the AIC has been reduced to $6276.9$ and the current model is the relatively optimized model and let's check its summary output.
+
+```{r}
+summary(fit_step1)
+```
+
+**Interpretation**:
+
+The result tells us that we could use the model:
+
+$CreditScore$~$Status+log(Duration)+History+Purpose+log(Amount)+Savings+Disposable+Personal+OtherParties+log(Age)+Plans+Housing+Telephone+Foreign$. Let's call it *fit1*.
+
+```{r echo=FALSE}
+fit1<-lm(CreditScore~Status+Duration+History+Purpose+Amount+Savings+Disposable+Personal+OtherParties+Age+Plans+Housing+Telephone+Foreign,data =Train)
+```
+
+```{r}
+print(sprintf("fit1$adj.r.squared = %f",summary(fit1)$adj.r.squared))
+```
+
+And the corresponding coefficients of this model are:
+
+```{r echo=FALSE}
+coef(fit_step1)
+```
+
+We find that the least significant variables such as Employment, Residence, Existing, Job and Dependants have been removed from the full model. 
+
+We see that continuous variables $log(Duration)$, $log(Amount)$ are significant at $5\%$ level while $log(Age)$ is significant at $10\%$ level. Considering the exploratory plots, for Duration and Amount, there is a strong negative association between CreditScore and them while for Age, mild positive association is seen. 
+
+We also see the strong association between Status, History, Purpose, Savings, Disposable, Personal, OtherParties, Plans, Housing, Telephone, Foreign and CreditScore. Notice that this is not simultaneous interpretation, every variables is interpreted after accounting for others. Considering previous exploratory plots, we see that applicant with Status (None) or History (E) or Purpose (Training) or Savings (Verylarge) or Disposable (3) or Personal (Single), OtherParties (Guarantor) or Plans (None) or Housing (Own) or Telephone (Yes) or Foreign (Yes) has a higher CreditScore. 
+
+Note that the $R_{adj}^2=0.704389$ still suggests a good fit, which has been increased from $R_{adj}^2=0.703252$ of full model.
+
+Moreover, it is worthwhile to note that the model is not guaranteed to be the best model since not every possible model is evaluated.
+
+Let's fit the null model and use backward stepwise regression.
+
+```{r echo=FALSE}
+fit_null<-lm(CreditScore~1,data=Train)
+biggest<-formula(lm(CreditScore~.,data=Train))
+fit_null_step<-step(fit_null,direction="forward",scope=biggest)
+```
+
+```{r}
+summary(fit_null_step)
+```
+
+We see that the model is the same as *fit1*, so we just keep *fit1* as our chosen best model.
+
+# Diagnostic checks
+
+Let's check whether error is normally distributed.
+
+```{r echo=FALSE}
+qqPlot(fit1)
+hist(rstudent(fit1))
+```
+
+**Interpretation**:
+
+Although the QQ-plot of *fit1* is not completely a straight line, almost all points are inside the confidence interval and the histogram of the residuals is approximately normal distributed. Therefore, the error is approximately normal distributed and the small skewness will not cause much affect to the results. Note that the two outlying data points has been highlighted, $no.272$ and $no.639$, considering the skewness might be caused by outliers, we want to know which in order to see what happens if they are removed later. 
+
+Let's check whether errors have constant variances.
+
+```{r echo=FALSE}
+residualPlots(fit1,terms=~Duration+Amount+Age,tests=FALSE)
+crPlots(fit1,terms=~Duration+Amount+Age)
+```
+
+**Interpretation**:
+
+The residual plot for $log(Age)$ is approximately straight line hence the skewness of residual plot for age might be caused by outliers, while for $log(Duration)$ and $log(Amount)$, plots tends to be downward so the trend is a little bit non-monotonic but it is not too bad. So we just try power transformation for them to see what happen, called model *fit2*.
+
+$log(Duration) \to (log(Duration))^2$
+
+$log(Amount) \to (log(Amount))^2$
+
+```{r echo=FALSE}
+fit2<-lm(CreditScore~Status+I(Duration^2)+History+Purpose+I(Amount^2)+Savings+Disposable+Personal+OtherParties+Age+Plans+Housing+Telephone+Foreign,data=Train)
+```
+
+Let's check the residual plots as well.
+
+```{r echo=FALSE}
+residualPlots(fit2,terms=~I(Duration^2)+I(Amount^2)+Age,tests=FALSE)
+crPlots(fit2,terms=~I(Duration^2)+I(Amount^2)+Age)
+```
+
+**Interpretation**:
+
+We see that the plots become much better and all the Component+Residual Plots are approximately straight lines. Moreover, the residual plots are approximately around 0 and have no clear patterns except some outliers, which is acceptable. Thus, the assumptions for linear regression are satisfied.
+
+So we keep *fit2* as our best model and let's check the summary output.
+
+```{r}
+summary(fit2)
+print(sprintf("fit2$adj.r.squared = %f",summary(fit2)$adj.r.squared))
+```
+
+
+**Interpretation**:
+
+We find that $(log(Duration))^2$ and $(log(Amount)^2$ are still significant at $5\%$ level and $R_{adj}^2$ has been increased to $0.707831$, which shows a good fit of our model *fit2*. 
+
+Moreover, we also need to test whether there are unusual or influential observations which could affect the result.
+
+Let's look for outliers and high-leverage points.
+
+```{r echo=FALSE}
+influencePlot(fit2)
+influenceIndexPlot(fit2)
+```
+
+**Interpretation**:
+
+From the plots and the output values: 
+
+Observations $no.272$,$no.639$,$no.325$ have a high value of |StudRes| $>2$ so these three observations are considered as outliers. 
+
+Observation $no.137$ and $no.208$ have high Hat values much larger than $2p/n=15\times2/800=0.0375$ so considered as high-leverage points. However, the CookD of them are very small so these two points are not influential.
+
+Observation $no.325$ and $no.611$ have a high value of CookD, so these two observations could be influential.
+
+However, the value of CookD don't differ so much and all of them are $<1$ so we focus on the StudRes and Hat-Values first.
+
+Let's consider the model with the removal of points:
+
+*fit3*: model *fit2* with the removal of observation *no.272*, which has the highest value of |StudRes|.
+
+```{r}
+Train1<-Train[-c(272),]
+fit3<-lm(fit2,data=Train1)
+```
+
+```{r echo=FALSE}
+compareCoefs(fit2,fit3,se=FALSE)
+```
+
+```{r}
+influencePlot(fit3)
+print(sprintf("fit3$adj.r.squared = %f",summary(fit3)$adj.r.squared))
+```
+
+**Interpretation**:
+
+After we delete $no.272$,the CookD for the whole model changed but $no.639$ still has the largest high |StudtRes|. Notice that $R_{adj}^2$ has been increased to $0.710646$. Let's try removing $no.639$ to see what happens, called *fit4*.
+
+```{r}
+Train2<-Train[-c(272,639),]
+fit4<-lm(fit2,data=Train2)
+```
+
+```{r echo=FALSE}
+compareCoefs(fit2,fit3,fit4,se=FALSE)
+```
+
+```{r}
+summary(fit4)
+print(sprintf("fit4$adj.r.squared = %f",summary(fit4)$adj.r.squared))
+```
+
+**Interpretation**:
+
+According to the comparison and summary, the model changed after deleting the observation *no.272* and *no.639*. Coefficient of $log(Age)$ has been increased by about $6\%$ and $log(Age)$ become more significant by summary output. The $R_{adj}^2$ has been increased to $0.712758$. 
+
+Let's remove $no.325$ to see what happens, called *fit5*.
+
+```{r}
+Train3<-Train[-c(272,639,325),]
+fit5<-lm(fit2,data=Train3)
+```
+
+```{r echo=FALSE}
+residualPlots(fit5,terms=~I(Duration^2)+I(Amount^2)+Age,tests=FALSE)
+crPlots(fit5,terms=~I(Duration^2)+I(Amount^2)+Age)
+compareCoefs(fit2,fit3,fit4,fit5,se=FALSE)
+```
+
+```{r}
+print(sprintf("fit2$adj.r.squared = %f",summary(fit2)$adj.r.squared))
+print(sprintf("fit3$adj.r.squared = %f",summary(fit3)$adj.r.squared))
+print(sprintf("fit4$adj.r.squared = %f",summary(fit4)$adj.r.squared))
+print(sprintf("fit5$adj.r.squared = %f",summary(fit5)$adj.r.squared))
+```
+
+**Interpretation**:
+
+After deleting *no.272*,*no.639* and *no.325*, according to the comparison and summary: $log(Age)$ become more significant by summary output. The $R_{adj}^2$ has been increased to $0.713202$. However, the differences are very small so this is further evidence that it is not a clear call, and it is not right or wrong to remove these observations. Depending on what we want to do with the model (e.g. if we want to make predictions), we could even use both models and see how the outcome differs. According to residual and Component+Residual Plot, the assumption still holds. 
+
+If we take a look at the $no.325$, we find that it has higher Amount but lower CreditScore extremely (the red points shown below). So this observation should be deleted since it may influence the accuracy of prediction for general individuals.
+
+Actually, it is hard to say whether we should remove these three observations, we should be very careful when considering the deletion of observations. This could be discussed separately. We can determine that the observation is an outlier because of data errors in recording or because a protocal wasn't followed. In these cases, deleting the offending observation seems reasonable. However, some observations may have some interesting characteristics, which might give useful insight to our study, which is a subjective judgment. Therefore, we evaluate them in prediction part.
+
+```{r echo=FALSE}
+Train[325,]
+plot(Train$Amount,Train$CreditScore)
+points(Train$Amount[325],Train$CreditScore[325],col="red")
+abline(lm(CreditScore~Amount,data=Train),col="red")
+```
+
+# Model Prediction
+
+Summary of current model:
+
+*fit2*: best model we find:
+
+$CreditScore$~$Status+(log(Duration))^2+History+Purpose+(log(Amount))^2+Savings+Disposable+Personal+OtherParties+log(Age)+Plans+Housing+Telephone+Foreign$
+
+*fit3*: best model with the removal of *no.272*.
+
+*fit4*: best model with the removal of both *no.272* and *no.639*.
+
+*fit5*: best model with the removal of both *no.272*,*no.639* and *no.325*.
+
+We will use the *Test.txt* data to predict the responses for individuals.
+
+We use the mean-square error (MSE) as a criterion of the quality for *full model*,*fit2*, *fit3*, *fit4* and *fit5*.
+
+```{r echo=FALSE}
+Test$Duration<-log(Test$Duration)
+Test$Amount<-log(Test$Amount)
+Test$Age<-log(Test$Age)
+TestResponses=select(Test,CreditScore)$CreditScore ## True responses in the test set
+
+prediction1<-predict(fit_full,select(Test,-CreditScore))
+mse1<-mean((prediction1-TestResponses)^2)
+print(sprintf("full_MSE = %f",mse1))
+
+prediction2<-predict(fit2,select(Test,-CreditScore))
+mse2<-mean((prediction2-TestResponses)^2)
+print(sprintf("fit2_MSE = %f",mse2))
+
+prediction3<-predict(fit3,select(Test,-CreditScore))
+mse3<-mean((prediction3-TestResponses)^2)
+print(sprintf("fit3_MSE = %f",mse3))
+
+
+prediction4<-predict(fit4,select(Test,-CreditScore))
+mse4<-mean((prediction4-TestResponses)^2)
+print(sprintf("fit4_MSE = %f",mse4))
+
+prediction5<-predict(fit5,select(Test,-CreditScore))
+mse5<-mean((prediction5-TestResponses)^2)
+print(sprintf("fit5_MSE = %f",mse5))
+```
+
+Let's also draw the graph for fitted value and True Value for models.
+
+```{r echo=FALSE}
+plot(prediction1,TestResponses,col="blue",xlab="fitted value",main="Fitted Value vs True Value for full model and fit2")
+abline(0,1)
+points(prediction2,TestResponses,col="red")
+legend("bottomright",legend=c("full model","fit2"),col=c("blue","red"),pch=1)
+
+plot(prediction2,TestResponses,col="blue",xlab="fitted value",main="Fitted Value vs True Value for fit2 and fit3")
+abline(0,1)
+points(prediction3,TestResponses,col="red")
+legend("bottomright",legend=c("fit2","fit3"),col=c("blue","red"),pch=1)
+
+plot(prediction2,TestResponses,col="blue",xlab="fitted value",main="Fitted Value vs True Value for fit2 and fit4")
+abline(0,1)
+points(prediction4,TestResponses,col="red")
+legend("bottomright",legend=c("fit2","fit4"),col=c("blue","red"),pch=1)
+
+plot(prediction2,TestResponses,col="blue",xlab="fitted value",main="Fitted Value vs True Value for fit2 and fit5")
+abline(0,1)
+points(prediction5,TestResponses,col="red")
+legend("bottomright",legend=c("fit2","fit5"),col=c("blue","red"),pch=1)
+```
+
+**Interpretation**:
+
+Compared to full model, our best model *fit2* has a lower MSE $2443.477$. The plot shows that *fit2* is much better than *full model* $2468.28$ since the points concentrate more along the $y=x$ axis.
+
+We see that the MSE tends to decreases as we delete the outliers and *fit5* has the lowest MSE $2425.234$. So our best model is now *fit5*.
+
+Let's summarize our data into a data frame and predict:
+
+```{r echo=FALSE}
+pred_int<-predict(fit5,newdata =select(Test,-CreditScore),interval="prediction",level=0.95)
+list<-cbind(pred_int,TestResponses)
+names<-c("fitted_value","lower_bound","upper_bound","true_value")
+dimnames(list)=list(c(1:200),names)
+list
+lt<-data.frame(list)
+lt<-filter(lt,true_value>=lower_bound,true_value<=upper_bound)
+str(lt)
+```
+
+**Interpretation**:
+
+After filtering, we see that 191 of 200 ($191/200=95.5\%$) values of CreditScore are in the $95\%$ predictive intervals given by our model *fit5*. We can say that $95.5\%$ individuals lie in the predictive interval, which is a high rate. However, we could not infer causality here.
+
+```{r}
+a<-ifelse(prediction5<500,1,0)
+b<-ifelse(Test$CreditScore<500,1,0)
+print(sprintf("num of individual correctly classified = %f",sum(a==b)))
+```
+
+The proportion of individuals who are correctly classified by our model *fit5* is $174/200=87\%$.
+
+All in all, our model *fit5* is sufficient.
+
+# Summary
+
+The model we build is: $CreditScore$~$Status+(log(Duration))^2+History+Purpose+(log(Amount))^2+Savings+Disposable+Personal+OtherParties+log(Age)+Plans+Housing+Telephone+Foreign$
+and corresponding coefficients are:
+
+```{r echo=FALSE}
+coef(fit2)
+```
+
+We found strong evidence between CreditScore and factors like Status, History, Purpose, Savings, Personal, Disposable,
+OtherParties, Plans, Housing, Telephone, Foreign. Specifically, applicant with Status (None) or History (E) or Purpose (Training) or Savings (Verylarge) or Disposable (3) or Personal (Single) or OtherParties (Guarantor) or Plans (None) or Housing (Own) or Telephone (Yes) or Foreign (No) has a higher CreditScore, which could be the basis of lending decision. Moreover, we see that applicant who requests lower amount with shorter duration seems to have higher credit score and applicant who requests lower amount with identity of a non-foreign worker has a higher credit score and applicant with worse previous loan history has higher credit score, which might due to correlation between History and Amount, but the causality is to be determined. For continuous variables, Age has a strong negative association with CreditScore while Duration and Amount have strong negative association with CreditScore, but the causality is to be determined. 
+
+After prediction, we found our model is much better than the full model by considering the MSE. We also found our $95\%$ predictive intervals contains $191$ among $200$ samples, which suggests a considerable match. The proportion of the individuals correctly classified is $87\%$.
+
+In conclusion, Duration, Amount and Age therefore seem the most plausible explanation for differences in CreditScore. We note the significant association between the other variables and CreditScore when considered on their own. Moreover, our model could be improved by considering the correlations between factors and continuous variables, such as Foreign and Duration, History and Amount, Duration and Amount, etc. For instance, adding interactions between variables might increase the accuracy of our model.
+
+Finally, there could be other important variables affecting credit score that we haven't observed and a causal link can not be inferred based on this study alone, more samples and further tests are required.
+
+
+
+
+
+
+
+
