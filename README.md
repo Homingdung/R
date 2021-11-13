@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This is a case study by using linear model.
+Linear model: ```risk_analysis.Rmd```
 
 >  This course work is based on *MATH2011 Statistical Models and Methods*, School of Mathematical Sciences, University of Nottingham, UK
 >  Lecturer:
@@ -11,7 +11,13 @@ This is a case study by using linear model.
 >  + Spring: Dr Chris Fallaize
 >  Thanks to Frank, who gives me lots of insights in theoretical knowledge, and Chris, who prepared lots of nice materials for us to touch many practical skills by R. 
 
+Optimization: ```Coursework.opt.Rmd```
 
+> This is coursework of MATH3027 Optimization.
+> 
+> Lecturer:
+> 
+> + Autumn: Prof. Richard Wilkinson
 
 ## Usage
 
