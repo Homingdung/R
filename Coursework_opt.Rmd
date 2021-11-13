@@ -1,0 +1,51 @@
+---
+title: "Coursework_opt"
+output: html_document
+---
+
+## Question 1
+Find all of the stationary points of f:
+$$f(x,y)=2y^4-x^2+1+(x^2+2y^2-1)^2.$$
+Calculate the gradient of function $f$:
+$$
+\nabla f=\left(\begin{matrix}
+(-2x+2(x^2+2y^2-1)(2x) \\ 
+8y^3+2(x^2+2y^2-1)(4y))\\
+\end{matrix}
+\right)
+=\left(\begin{matrix}
+0\\0
+\end{matrix}\right)
+$$
+
+Simply two equations, we can get $$x(2x^2+4y^2-3)=0, y(x^2+3y^2-1)=0$$
+
+Solve them we can get the stationary points: $(0,0),(0,-\frac{1}{\sqrt{3}}),(0,\frac{1}{\sqrt{3}}),(-\frac{\sqrt{6}}{2},0),(\frac{\sqrt{6}}{2},0)$
+
+Compute the Hessian:
+$$
+\nabla^2f(x,y)=\left(
+\begin{matrix}
+12x^2+8y^2-6 & 16xy \\
+16xy & 8x^2+72y^2-8\\
+\end{matrix}
+\right)
+$$
+
+Evaluate stationary points:
+$\nabla^2f(0,0)= \left(\begin{matrix}-6 & 0\\ 0 & -8\end{matrix}\right)$, 
+$\nabla^2f(0,-\frac{1}{\sqrt{3}})= \left(\begin{matrix}-\frac{10}{3} & 0\\ 0 & 16\end{matrix}\right)$,
+$\nabla^2f(0,\frac{1}{\sqrt{3}})= \left(\begin{matrix}\frac{10}{3} & 0\\ 0 & 16\end{matrix}\right)$, 
+$\nabla^2f(-\frac{\sqrt{6}}{2},0)= \left(\begin{matrix}12 & 0\\ 0 & 4\end{matrix}\right)$, 
+$\nabla^2f(\frac{\sqrt{6}}{2},0)= \left(\begin{matrix}12 & 0\\ 0 & 4\end{matrix}\right)$,
+
+Since all non-zero elements appear on the diagnal, it is obvious that they are the eigenvalues of each matrix. so 
+$(0,0)$ is a strict local maximum, since Hessian matrix is negative definite.
+
+$(-\frac{\sqrt{6}}{2},0),(\frac{\sqrt{6}}{2},0)$ are strict local minimum, since Hessian matrices are positive definite.
+
+$(0,-\frac{1}{\sqrt{3}}),(0,\frac{1}{\sqrt{3}})$ are saddle point.
+
+
+
+
