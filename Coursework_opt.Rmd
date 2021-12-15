@@ -1,4 +1,5 @@
 ---
+<<<<<<< HEAD
 title: "MATH 3027 Optimization 2021: Coursework 1"
 author: "Mingdong He"
 output: pdf_document
@@ -10,6 +11,16 @@ Find all of the stationary points of f:
 $$f(x,y)=2y^4-x^2+1+(x^2+2y^2-1)^2.$$
 Calculate the gradient of function $f$:
 
+=======
+title: "Coursework_opt"
+output: html_document
+---
+
+## Question 1
+Find all of the stationary points of f:
+$$f(x,y)=2y^4-x^2+1+(x^2+2y^2-1)^2.$$
+Calculate the gradient of function $f$:
+>>>>>>> db24d45ac1af449af7b675ded090edbcf76a7a0b
 $$
 \nabla f=\left(\begin{matrix}
 (-2x+2(x^2+2y^2-1)(2x) \\ 
@@ -23,12 +34,18 @@ $$
 
 Simply two equations, we can get $$x(2x^2+4y^2-3)=0, y(x^2+3y^2-1)=0$$
 
+<<<<<<< HEAD
 Solve them we can get the stationary points:
 
 $(0,0),(0,-\frac{1}{\sqrt{3}}),(0,\frac{1}{\sqrt{3}}),(-\frac{\sqrt{6}}{2},0),(\frac{\sqrt{6}}{2},0)$
 
 Compute the Hessian:
 
+=======
+Solve them we can get the stationary points: $(0,0),(0,-\frac{1}{\sqrt{3}}),(0,\frac{1}{\sqrt{3}}),(-\frac{\sqrt{6}}{2},0),(\frac{\sqrt{6}}{2},0)$
+
+Compute the Hessian:
+>>>>>>> db24d45ac1af449af7b675ded090edbcf76a7a0b
 $$
 \nabla^2f(x,y)=\left(
 \begin{matrix}
@@ -39,13 +56,17 @@ $$
 $$
 
 Evaluate stationary points:
+<<<<<<< HEAD
 
+=======
+>>>>>>> db24d45ac1af449af7b675ded090edbcf76a7a0b
 $\nabla^2f(0,0)= \left(\begin{matrix}-6 & 0\\ 0 & -8\end{matrix}\right)$, 
 $\nabla^2f(0,-\frac{1}{\sqrt{3}})= \left(\begin{matrix}-\frac{10}{3} & 0\\ 0 & 16\end{matrix}\right)$,
 $\nabla^2f(0,\frac{1}{\sqrt{3}})= \left(\begin{matrix}\frac{10}{3} & 0\\ 0 & 16\end{matrix}\right)$, 
 $\nabla^2f(-\frac{\sqrt{6}}{2},0)= \left(\begin{matrix}12 & 0\\ 0 & 4\end{matrix}\right)$, 
 $\nabla^2f(\frac{\sqrt{6}}{2},0)= \left(\begin{matrix}12 & 0\\ 0 & 4\end{matrix}\right)$,
 
+<<<<<<< HEAD
 Since all non-zero elements appear on the diagnal, it is obvious that they are the eigenvalues of each matrix. 
  
 1. $(0,0)$ is a strict local maximum, since Hessian matrix is negative definite.
@@ -596,6 +617,15 @@ Gauss_Newton(theta,t,Y,Print=TRUE)
 ```
 
 After 7 iterations, my program converges to optimal value $(g,k)=(18.8574,1.07835)$ with the value of objective as $s(g,k)=3.9$.
+=======
+Since all non-zero elements appear on the diagnal, it is obvious that they are the eigenvalues of each matrix. so 
+$(0,0)$ is a strict local maximum, since Hessian matrix is negative definite.
+
+$(-\frac{\sqrt{6}}{2},0),(\frac{\sqrt{6}}{2},0)$ are strict local minimum, since Hessian matrices are positive definite.
+
+$(0,-\frac{1}{\sqrt{3}}),(0,\frac{1}{\sqrt{3}})$ are saddle point.
+
+>>>>>>> db24d45ac1af449af7b675ded090edbcf76a7a0b
 
 
 
