@@ -1,0 +1,601 @@
+---
+title: "MATH 3027 Optimization 2021: Coursework 1"
+author: "Mingdong He"
+output: pdf_document
+---
+
+# Question 1
+Find all of the stationary points of f:
+
+$$f(x,y)=2y^4-x^2+1+(x^2+2y^2-1)^2.$$
+Calculate the gradient of function $f$:
+
+$$
+\nabla f=\left(\begin{matrix}
+(-2x+2(x^2+2y^2-1)(2x) \\ 
+8y^3+2(x^2+2y^2-1)(4y))\\
+\end{matrix}
+\right)
+=\left(\begin{matrix}
+0\\0
+\end{matrix}\right)
+$$
+
+Simply two equations, we can get $$x(2x^2+4y^2-3)=0, y(x^2+3y^2-1)=0$$
+
+Solve them we can get the stationary points:
+
+$(0,0),(0,-\frac{1}{\sqrt{3}}),(0,\frac{1}{\sqrt{3}}),(-\frac{\sqrt{6}}{2},0),(\frac{\sqrt{6}}{2},0)$
+
+Compute the Hessian:
+
+$$
+\nabla^2f(x,y)=\left(
+\begin{matrix}
+12x^2+8y^2-6 & 16xy \\
+16xy & 8x^2+72y^2-8\\
+\end{matrix}
+\right)
+$$
+
+Evaluate stationary points:
+
+$\nabla^2f(0,0)= \left(\begin{matrix}-6 & 0\\ 0 & -8\end{matrix}\right)$, 
+$\nabla^2f(0,-\frac{1}{\sqrt{3}})= \left(\begin{matrix}-\frac{10}{3} & 0\\ 0 & 16\end{matrix}\right)$,
+$\nabla^2f(0,\frac{1}{\sqrt{3}})= \left(\begin{matrix}\frac{10}{3} & 0\\ 0 & 16\end{matrix}\right)$, 
+$\nabla^2f(-\frac{\sqrt{6}}{2},0)= \left(\begin{matrix}12 & 0\\ 0 & 4\end{matrix}\right)$, 
+$\nabla^2f(\frac{\sqrt{6}}{2},0)= \left(\begin{matrix}12 & 0\\ 0 & 4\end{matrix}\right)$,
+
+Since all non-zero elements appear on the diagnal, it is obvious that they are the eigenvalues of each matrix. 
+ 
+1. $(0,0)$ is a strict local maximum, since Hessian matrix is negative definite.
+
+2. $(-\frac{\sqrt{6}}{2},0),(\frac{\sqrt{6}}{2},0)$ are strict local minimum, since Hessian matrices are positive definite.
+
+3. $(0,-\frac{1}{\sqrt{3}}),(0,\frac{1}{\sqrt{3}})$ are saddle points, since their Hessians have both positive and negative eigenvalues so undefinite.
+
+
+# Question 2
+
+```{r}
+load(file="R/CW1_PimaData.rda")
+head(X)
+head(y)
+```
+```{r}
+fit<-glm(diabetes~.-1,family=binomial,data=Pima.dat)
+coef(fit)
+```
+
+```{r}
+h<-function(z){
+  1/(1+exp(-z))
+}
+X_pos=X[y==1,]
+X_neg=X[y==0,]
+
+loglike<-function(theta){
+  sum(log(h(X_pos%*%theta)))+sum(log(1-h(X_neg%*%theta)))
+}
+```
+
+
+## i.Gradient:
+
+Formula derivation:
+
+Intuition: By observation, we found that:
+
+$$
+h(t)'=(\frac{1}{1+e^{-t}})'=\frac{e^{-t}}{(1+e^{-t})^2}=\frac{1}{1+e^{-t}}(1-\frac{1}{1+e^{-t}})=h(t)(1-h(t))
+$$
+Similarly, considering the coefficient in front of $h$:
+
+$$
+h(x_i^T \theta)'=h(x_i^T \theta)(1-h(x_i^T \theta))x_i
+$$
+Thus: 
+
+$$
+\begin{aligned}
+\nabla l(\theta) &=\nabla (\sum_{i=1}^ny_i\log h(x_i^T \theta)+(1-y) \log (1-h(x_i^T \theta)))\\
+&=\sum_{i=1}^n(\frac{y_ih(x_i^T \theta)(1-h(x_i^T \theta))x_i}{h(x_i^T \theta)}-(1-y_i)\frac{h(x_i^T \theta)(1-h(x_i^T \theta))x_i}{1-h(x_i^T \theta)})\\
+&=\sum_{i=1}^n(y_i(1-h(x_i^T \theta))x_i-(1-y_i)h(x_i^T \theta)x_i)\\
+&=\sum_{i=1}^n(y_i-h(x_i^T \theta))x_i\\
+&=X^T(y-\hat{y}(\theta))
+\end{aligned}
+$$
+as desired if we use matrix form followed by question.
+
+```{r}
+gradient_l<-function(theta){
+  y_hat<-h(X%*%theta)
+  out<-t(X)%*%(y-y_hat)
+  return(out)
+}
+# input is 3 by 1 vector
+theta<-matrix(0,nr=3)
+gradient_l(theta)
+```
+
+Numerical checking by finite difference approximation:
+
+```{r}
+theta<-matrix(0,nr=3)
+eps<-10^-5
+central_diff<-function(theta,eps){
+  d1<-(loglike(theta+c(eps,0,0))-loglike(theta-c(eps,0,0)))/(2*eps)
+  d2<-(loglike(theta+c(0,eps,0))-loglike(theta-c(0,eps,0)))/(2*eps)
+  d3<-(loglike(theta+c(0,0,eps))-loglike(theta-c(0,0,eps)))/(2*eps)
+  return(c(d1,d2,d3))
+}
+central_diff(theta,eps)
+```
+
+The result is consistent with previous one.
+
+## ii. Gradient decent method:
+
+```{r}
+#Max l(theta) ~ Min -l(theta)
+gradient_Desent<-function(theta,t_bar,Print){
+  trajectory<-theta
+  for (i in 2:10^6){
+    theta<-theta+t_bar*gradient_l(theta)
+    grad=-gradient_l(theta)
+    
+    if (sqrt(sum(grad^2)) < 10^-3){
+      break
+    }
+    trajectory<-cbind(trajectory,theta)
+  }
+  if(Print){
+      fun_val=loglike(theta)  # we don't need this unless we are printing it out
+      print(paste('-------------- Iteration ',i-1, ' -------------'))
+      print(paste("l(theta) = ", signif(fun_val,3), " norm_grad = ", signif(sqrt(sum(grad^2)),3)))
+  }
+  return(trajectory)
+}
+
+theta<-matrix(0,nr=3)
+t_bar=10^-6
+trajectory<-gradient_Desent(theta,t_bar,Print = TRUE)
+```
+
+Optimal value is:
+```{r echo=FALSE}
+trajectory[,36315]
+```
+
+
+Plot the trajectory:
+
+```{r}
+plot(trajectory[1,],type="l",col='black',xlab='iteration',ylab='value',ylim=c(-0.05,0.06))
+par(new=TRUE)
+plot(trajectory[2,],type="l",col='blue',xlab='iteration',ylab='value',ylim=c(-0.05,0.06))
+par(new=TRUE)
+plot(trajectory[3,],type="l",col='red',xlab='iteration',ylab='value',ylim=c(-0.05,0.06))
+legend(x = "topright",legend=c("pregnant", "glucose",'pressure'),col=c("black", "blue","red"), lty=1:2, cex=0.8)
+```
+
+## iii: larger stepsize
+
+using $\bar{t}=10^{-5}$
+
+In fact, this program can not converge if we use $\bar{t}=10^{-5}$. The reason might be that the stepsize is too large, e.g:oscillation might happens so it cannot reach the optimal point.
+
+## iv. Backtracking:
+
+```{r}
+gradient_Desent_Backtracking<-function(theta,Print,s,alpha,beta){
+  stopifnot(beta>0,beta<1,alpha>0,alpha<1)
+  trajectory<-theta
+  for (i in 1:10^6){
+    fun_val<-loglike(theta)
+    grad=gradient_l(theta)
+    t_bar<-s
+    while (loglike(theta+t_bar*grad) - fun_val< (alpha*t_bar*sum(grad^2))){
+      t_bar<-beta*t_bar
+    }
+    theta<-theta+t_bar*gradient_l(theta)
+    if (sqrt(sum(grad^2)) < 10^-3){
+      break
+    }
+    trajectory<-cbind(trajectory,theta)
+    
+  }
+  
+  if(Print){
+      grad<-gradient_l(theta)
+      fun_val<-loglike(theta)  # we don't need this unless we are printing it out
+      print(paste('-------------- Iteration ', i-1, ' -------------'))
+      print(paste("l(theta) = ", signif(fun_val,3), " norm_grad = ", signif(sqrt(sum(grad^2)),3)))
+  }
+  return(trajectory)
+}
+
+```
+
+
+Run our code to get the iterations and optimal
+
+```{r}
+theta<-matrix(0,nr=3)
+z<-gradient_Desent_Backtracking(theta,Print = TRUE,1,0.25,0.5)
+```
+
+Optimal value of $\theta$ is 
+
+```{r echo=FALSE}
+z[,7835]
+```
+
+It works much better than the gradient descent method.
+
+Try other parameters:
+
+If we change $\alpha$,
+
+$\alpha=0.5$
+
+```{r echo=FALSE}
+z<-gradient_Desent_Backtracking(theta,Print = TRUE,1,0.5,0.5)
+```
+
+$\alpha=0.6$
+
+```{r echo=FALSE}
+z<-gradient_Desent_Backtracking(theta,Print = TRUE,1,0.6,0.5)
+```
+
+$\alpha=0.8$
+
+```{r echo=FALSE}
+z<-gradient_Desent_Backtracking(theta,Print = TRUE,1,0.8,0.5)
+```
+
+$\alpha=0.9$
+
+```{r echo=FALSE}
+z<-gradient_Desent_Backtracking(theta,Print = TRUE,1,0.9,0.5)
+```
+
+when $\alpha=0.8$ controlling other parameters, our program works well.
+
+If we change $\beta$
+
+$\beta=0.2$
+
+```{r echo=FALSE}
+z<-gradient_Desent_Backtracking(theta,Print = TRUE,1,0.25,0.2)
+```
+
+$\beta=0.3$
+
+```{r echo=FALSE}
+z<-gradient_Desent_Backtracking(theta,Print = TRUE,1,0.25,0.1)
+```
+
+when $\beta=0.2$ controlling other parameters, our program works well.
+
+**Discussion:** 
+
+1. Changing parameters will change the efficiency of our code.
+2. Small change could make a huge difference, sometimes our code is sensitive to them.
+3. There do exist a better parameters, like $s=1,\alpha=0.8,\beta=0.5$, which only requires less than 2000 iterations. So we need to do more research of how to improve the efficiency of our code.
+
+## v. Computing the Hessian matrix:
+
+Since we have already known that:
+
+$$
+\begin{aligned}
+\nabla l(\theta) &=\sum_{i=1}^n(y_i-h(x_i^T \theta)x_i)\\
+&=X^T(y-\hat{y}(\theta))
+\end{aligned}
+$$
+
+Let's take one more derivative to get the Hessian:
+
+$$
+\begin{aligned}
+H=\nabla^2 l(\theta)&=\frac{\partial}{\partial\theta^T}(\sum_{i=1}^n(y_i-h(x_i^T \theta)x_i)\\
+&=\sum_{i=1}^n x_ih(x_i^T\theta)(h(x_i^T\theta)-1)x_i^T\\
+&=X^TAX
+\end{aligned}
+$$
+
+where $A^{n \times n}$ is a diagonal matrix: 
+
+$$
+A=\left(\begin{matrix}
+h(x_1^T\theta)(h(x_1^T\theta)-1) & ...& 0\\
+. &... & .\\
+0 &.. &h(x_n^T\theta)(h(x_n^T\theta-1)\\
+\end{matrix}
+\right)
+$$
+
+
+```{r}
+Hessian<-function(theta){
+  A<-matrix(0,nr=100,nc=100)
+  for (i in 1:100){
+    for (j in 1:100){
+      if(i==j){
+         A[i,j]<-h(t(X[i,]%*%theta))*(h(t(X[i,]%*%theta))-1)
+      }
+      
+    }
+  }
+  out<-t(X)%*%A%*%X
+  return(out)
+}
+theta<-matrix(0,nr=3)
+Hessian(theta)
+```
+
+Check the result numerically:
+
+```{r}
+library(numDeriv)
+numDeriv::hessian(loglike,theta)
+```
+
+They are consistent!
+
+## vi. Pure Newton's method:
+
+```{r}
+pure_Newton <- function(theta,Print){
+  trajectory<-theta
+  for (i in 2:10^6){
+    grad<-gradient_l(theta)
+    theta<-theta-solve(Hessian(theta),grad)
+    if (sqrt(sum(grad^2)) < 10^-3){
+      break
+      }
+    trajectory<-cbind(trajectory,theta)
+    
+    if(Print){
+     fun_val<-loglike(trajectory[,i])
+     print(paste('-------------- Iteration ', i-1, ' -------------'))
+     print(paste("l(theta) = ", signif(fun_val,3), " norm_grad = ", signif(sqrt(sum(grad^2)),3)))
+   }
+  }
+  return(trajectory)
+  
+}
+
+```
+
+Run our code to get the iterations and optimal value.
+
+```{r}
+theta<-matrix(0,nr=3)
+pure_Newton(theta,Print=TRUE)
+```
+
+After 3 iterations, the algorithm converges, which is significantly faster. The maximum likelihood estimate of $\theta$ is  
+
+```{r echo=FALSE}
+output<-pure_Newton(theta,Print=FALSE)
+output[,4]
+```
+
+## vii.Regularized
+
+we modify our code for regularized function:
+
+```{r}
+#target function to be minimized
+l_regular<-function(theta,lambda){
+  -loglike(theta)+lambda*(sum(theta^2))
+}
+#gradient of target function
+grad_regular<-function(theta,lambda){
+  -gradient_l(theta)+2*lambda*theta
+}
+
+#Hessian matrix of target function
+Hessian_regular<-function(theta,lambda){
+  -Hessian(theta)+2*lambda*diag(c(1,1,1))
+}
+
+#Newton's method applied to regularized function
+pure_Newton_regular <- function(theta,lambda,Print){
+  trajectory<-theta
+  for (i in 2:10^6){
+    grad<-grad_regular(theta,lambda)
+    theta<-theta-solve(Hessian_regular(theta,lambda),grad)
+    
+    if (sqrt(sum(grad^2)) < 10^-3){
+      break
+    }
+    trajectory<-cbind(trajectory,theta)
+    if(Print){
+     fun_val<-loglike(theta)
+     print(paste('-------------- Iteration ', i-1, ' -------------'))
+     print(paste("l(theta) = ", signif(fun_val,3), " norm_grad = ",signif(sqrt(sum(grad^2)),3)))
+   }
+  }
+  return(trajectory[,i-1]) #return the optimal value of theta
+  
+}
+
+```
+
+Run our code and get the iterations and optimal value of $\theta$.
+
+```{r}
+theta<-matrix(0,nr=3)
+Hessian_regular(theta,10^3)
+pure_Newton_regular(theta,10^3,Print=TRUE)
+```
+
+
+Plot the estimated value of parameters as $\lambda$ varies from $1$ to $10^6$, using a log-scale $\lambda$.
+
+```{r}
+lambda<-c(1,10,100,10^3,10^4,10^5,10^6)
+estimate<-matrix(0,nr=3,nc=length(lambda))
+for (i in 1:7){
+  estimate[,i]<-pure_Newton_regular(theta,lambda[i],Print=FALSE)
+  
+}
+# log-scale for lambda
+plot(log(lambda),estimate[1,],type="l",col='black',xlab='log(lambda)',ylab='value',ylim=c(-0.05,0.1))
+par(new=TRUE)
+plot(log(lambda),estimate[2,],type="l",col='blue',xlab='log(lambda)',ylab='value',ylim=c(-0.05,0.1))
+par(new=TRUE)
+plot(log(lambda),estimate[3,],type="l",col='red',xlab='log(lambda)',ylab='value',ylim=c(-0.05,0.1))
+legend(x = "topright",legend=c("pregnant", "glucose",'pressure'),col=c("black", "blue","red"), lty=1:2,cex=0.8)
+```
+
+
+# Question 3
+
+Data initialization
+
+```{r}
+t<-matrix(seq(0.25,2,0.25),nr=8)
+Y<-matrix(c(19.956,17.528,15.987,14.445,9.631,6.663,2.134,0.121),nr=8)
+```
+
+## i. Coding for functions
+
+function of $\theta=(g,k)^T$:
+
+```{r}
+#function f(t,g,k)
+f<-function(theta,t){
+  g<-theta[1]
+  k<-theta[2]
+  20-(g/k)*(t+exp(-k*t)/k-1/k)
+}
+
+#function s(g,k)
+s_gk<-function(theta){
+  sum((f(theta,t)-Y)^2)
+}
+
+#gradient of function f(t,g,k)
+gradient_f<-function(theta,t){
+  g<-theta[1]
+  k<-theta[2]
+  d1<--1/k*(1/k*exp(-k*t)-1/k+t)
+  d2<-g*exp(-k*t)/k^3*(k*t+exp(k*t)*(k*t-2)+2)
+  return(matrix(c(d1,d2),nr=2))
+}
+
+#gradient of function s(g,k)
+gradient_s_gk<-function(theta,t){
+  sg=0
+  sk=0
+  for (i in 1:8){
+    sg<-sg+2*(f(theta,t[i])-Y[i])*(gradient_f(theta,t[i])[1])
+    sk<-sk+2*(f(theta,t[i])-Y[i])*(gradient_f(theta,t[i])[2])
+  }
+  return (c(sg,sk))
+}
+
+```
+
+Calculate the gradient:
+
+```{r}
+theta<-c(10,2)
+gradient_s_gk(theta,t)
+```
+
+Check our answer numerically, we can see that they are consistent.
+
+```{r}
+numDeriv::grad(s_gk,theta)
+```
+
+
+
+## ii. Contour plot for $g\in [1,20], k\in[0,5]$:
+
+Note that we use $k\in[0.5,5]$ as a replacement to avoid NaN.
+
+```{r}
+library(pracma)
+#initialization
+g<-seq(1,20,length.out=20)
+k<-seq(0.5,5,length.out=5)
+out<-matrix(0,nr=length(g),nc=length(k)) 
+for (i in 1:length(g)){
+  for (j in 1:length(k)){
+    out[i,j]<-s_gk(c(g[i],k[j]))
+  }
+}
+
+```
+
+Let's get the contour plot.
+
+```{r}
+#visualize above value by contour plot 
+contour(g,k,out)
+```
+
+We could also have a clear picture of what is going on about our function by its whole perspectives.
+
+```{r}
+#whole view
+persp(g,k,out,zlab='s(g,k)',theta =30,phi=30)
+```
+
+
+## iii. Gauss-Newton algorithm
+
+```{r}
+Gauss_Newton<-function(theta,t,Y,Print){
+  J<-matrix(0,nr=8,nc=2)
+  F<-matrix(0,nr=8,nc=1)
+  trajectory<-theta
+  for (i in 2:10^3){
+    #Calculate the J F
+    for (j in 1:8){
+    J[j,]<-t(gradient_f(theta,t[j]))
+    F[j,]<-f(theta,t[j])-Y[j]
+    }
+    
+    #Calculate gradient
+    grad<-2*t(J)%*%F
+    theta<-theta-0.5*solve(t(J)%*%J,grad)
+    
+    #Stopping criteria
+    if (sqrt(sum(grad^2)) < 10^-3){
+      break
+      }
+    
+    trajectory<-cbind(trajectory,theta)
+    
+    #Print
+    if(Print){
+     fun_val<-sum((f(theta,t)-Y)^2)
+     print(paste('-------------- Iteration ', i-1, ' -------------'))
+     print(paste("s(g,k) = ", signif(fun_val,3),"norm_grad = ",signif(sqrt(sum(grad^2)),3)))
+     print(paste("g =",signif(trajectory[1,i]),"k =",signif(trajectory[2,i])))
+     }
+  }
+}
+```
+
+
+Run our code and get the iterations and optimal value of $\theta$.
+
+```{r}
+#starting from (g,k) = (10,2)
+theta<-matrix(c(10,2),nr=2)
+Gauss_Newton(theta,t,Y,Print=TRUE)
+```
+
+After 7 iterations, my program converges to optimal value $(g,k)=(18.8574,1.07835)$ with the value of objective as $s(g,k)=3.9$.
+
+
+
